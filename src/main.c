@@ -26,12 +26,12 @@ struct lang lang;
 struct config config;
 
 // args handles
-void arg_help(void* data, char** pars, const int pars_count)
+void arg_help(void *data, char **pars, const int pars_count)
 {
 	printf("If you want to configure Ly, please check the config file, usually located at /etc/ly/config.ini.\n");
 }
 
-void arg_version(void* data, char** pars, const int pars_count)
+void arg_version(void *data, char **pars, const int pars_count)
 {
 #ifdef GIT_VERSION_STRING
 	printf("Ly version %s\n", GIT_VERSION_STRING);
@@ -41,7 +41,7 @@ void arg_version(void* data, char** pars, const int pars_count)
 }
 
 // low-level error messages
-void log_init(char** log)
+void log_init(char **log)
 {
 	log[DGN_OK] = lang.err_dgn_oob;
 	log[DGN_NULL] = lang.err_null;
@@ -61,13 +61,13 @@ void log_init(char** log)
 	log[DGN_HOSTNAME] = lang.err_hostname;
 }
 
-void arg_config(void* data, char** pars, const int pars_count)
+void arg_config(void *data, char **pars, const int pars_count)
 {
 	*((char **)data) = *pars;
 }
 
 // ly!
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 	// init error lib
 	log_init(dgn_init());
@@ -79,15 +79,15 @@ int main(int argc, char** argv)
 	char *config_path = NULL;
 	// parse args
 	const struct argoat_sprig sprigs[ARG_COUNT] =
-	{
-		{NULL, 0, NULL, NULL},
-		{"config", 0, &config_path, arg_config},
-		{"c", 0, &config_path, arg_config},
-		{"help", 0, NULL, arg_help},
-		{"h", 0, NULL, arg_help},
-		{"version", 0, NULL, arg_version},
-		{"v", 0, NULL, arg_version},
-	};
+		{
+			{NULL, 0, NULL, NULL},
+			{"config", 0, &config_path, arg_config},
+			{"c", 0, &config_path, arg_config},
+			{"help", 0, NULL, arg_help},
+			{"h", 0, NULL, arg_help},
+			{"version", 0, NULL, arg_version},
+			{"v", 0, NULL, arg_version},
+		};
 
 	struct argoat args = {sprigs, ARG_COUNT, NULL, 0, 0};
 	argoat_graze(&args, argc, argv);
@@ -110,19 +110,19 @@ int main(int argc, char** argv)
 	config_load(config_path);
 	lang_load();
 
-	void* input_structs[3] =
-	{
-		(void*) &desktop,
-		(void*) &login,
-		(void*) &password,
-	};
+	void *input_structs[3] =
+		{
+			(void *)&desktop,
+			(void *)&login,
+			(void *)&password,
+		};
 
-	void (*input_handles[3]) (void*, struct tb_event*) =
-	{
-		handle_desktop,
-		handle_text,
-		handle_text,
-	};
+	void (*input_handles[3])(void *, struct tb_event *) =
+		{
+			handle_desktop,
+			handle_text,
+			handle_text,
+		};
 
 	desktop_load(&desktop);
 	load(&desktop, &login);
@@ -135,16 +135,17 @@ int main(int argc, char** argv)
 	// init visible elements
 	struct tb_event event;
 	struct term_buf buf;
-	
-	//Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
-	uint8_t active_input;
-        if (config.default_input == LOGIN_INPUT && login.text != login.end){
-        	active_input = PASSWORD_INPUT;
-        }
-        else{
-        	active_input = config.default_input;
-        }
 
+	// Place the curser on the login field if there is no saved username, if there is, place the curser on the password field
+	uint8_t active_input;
+	if (config.default_input == LOGIN_INPUT && login.text != login.end)
+	{
+		active_input = PASSWORD_INPUT;
+	}
+	else
+	{
+		active_input = config.default_input;
+	}
 
 	// init drawing stuff
 	draw_init(&buf);
@@ -173,6 +174,7 @@ int main(int argc, char** argv)
 	bool update = true;
 	bool reboot = false;
 	bool shutdown = false;
+	bool switch_os = false;
 	uint8_t auth_fails = 0;
 
 	switch_tty(&buf);
@@ -189,7 +191,7 @@ int main(int argc, char** argv)
 				animate(&buf);
 				draw_box(&buf);
 				draw_labels(&buf);
-				if(!config.hide_f1_commands)
+				if (!config.hide_f1_commands)
 					draw_f_commands();
 				draw_lock_state(&buf);
 				position_input(&buf, &desktop, &login, &password);
@@ -207,9 +209,12 @@ int main(int argc, char** argv)
 			tb_present();
 		}
 
-		if (config.animate) {
+		if (config.animate)
+		{
 			error = tb_peek_event(&event, config.min_refresh_delta);
-		} else {
+		}
+		else
+		{
 			error = tb_poll_event(&event);
 		}
 
@@ -228,6 +233,10 @@ int main(int argc, char** argv)
 				break;
 			case TB_KEY_F2:
 				reboot = true;
+				run = false;
+				break;
+			case TB_KEY_F3:
+				switch_os = true;
 				run = false;
 				break;
 			case TB_KEY_CTRL_C:
@@ -325,6 +334,10 @@ int main(int argc, char** argv)
 	if (reboot)
 	{
 		execl("/bin/sh", "sh", "-c", config.restart_cmd, NULL);
+	}
+	if (switch_os)
+	{
+		execl("/bin/sh", "sh", "-c", "/sbin/grub-reboot 2 && /sbin/reboot");
 	}
 
 	config_free();
